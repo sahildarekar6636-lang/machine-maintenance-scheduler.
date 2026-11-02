@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Machine Maintenance Scheduler</title>
+<style>
+:root{--bg:#f3f6f8;--card:#fff;--ink:#183247;--muted:#637787;--line:#dce5eb;--blue:#1769aa;--green:#16845b;--amber:#a66b12;--red:#b83227}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui, sans-serif}
+header{background:#123b5d;color:white;padding:24px 18px}header div,main{max-width:1100px;margin:auto}h1{margin:0;font-size:clamp(1.4rem,4vw,2rem)}header p{margin:6px 0 0;color:#d7e5ee}
+main{padding:18px 16px 40px;display:grid;grid-template-columns:330px 1fr;gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 12px #17354b0a}
+h2{font-size:1.05rem;margin:0 0 12px}label{display:block;color:var(--muted);font-size:.84rem;margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink);font:inherit}
+button{border:0;border-radius:9px;padding:10px 13px;background:var(--blue);color:white;font:inherit;cursor:pointer;margin-top:12px}
+button.secondary{background:#e9f0f5;color:#23445c}button.danger{background:#fff0ee;color:var(--red);padding:7px 9px;margin:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.full{grid-column:1/-1}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{padding:12px;background:#edf4f9;border:1px solid var(--line);border-radius:12px}.stat span{display:block;color:var(--muted);font-size:.78rem}.stat strong{font-size:1.5rem}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.toolbar select{max-width:180px}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:.86rem}th{color:var(--muted);background:#f8fafb}
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700}.overdue{background:#ffe7e4;color:#a52b20}.soon{background:#fff1d6;color:#855609}.ok{background:#e1f5eb;color:#126a49}
+.note{font-size:.79rem;color:var(--muted);margin-top:8px}.empty{text-align:center;color:var(--muted);padding:22px}
+@media(max-width:780px){main{grid-template-columns:1fr}}@media(max-width:430px){.grid{grid-template-columns:1fr}.full{grid-column:auto}.stats{gap:6px}.stat{padding:9px}.stat strong{font-size:1.25rem}}
+</style></head><body>
+<header><div><h1>Machine Maintenance Scheduler</h1><p>Plan inspections, lubrication and servicing to keep machines reliable and production running smoothly.</p></div></header>
+<main>
+<section class="card"><h2>Add maintenance task</h2><form id="form">
+<label>Machine name</label><input id="machine" required maxlength="60" placeholder="e.g. Lathe Machine">
+<div class="grid"><div><label>Maintenance type</label><select id="type"><option>Inspection</option><option>Lubrication</option><option>Cleaning</option><option>Part replacement</option><option>General servicing</option></select></div>
+<div><label>Repeat every (days)</label><input id="interval" type="number" min="1" max="3650" value="30" required></div>
+<div class="full"><label>Last maintenance date</label><input id="lastDate" type="date" required></div>
+<div class="full"><label>Notes (optional)</label><input id="notes" maxlength="120" placeholder="e.g. Check belt and bearings"></div></div>
+<button type="submit">＋ Add to schedule</button> <button type="button" class="secondary" id="sample">Load sample machines</button>
+<p class="note">The next due date is calculated from the last maintenance date and repeat interval.</p></form></section>
+<section><div class="stats"><div class="stat"><span>Total tasks</span><strong id="total">0</strong></div><div class="stat"><span>Due soon (7 days)</span><strong id="soon">0</strong></div><div class="stat"><span>Overdue</span><strong id="late">0</strong></div></div>
+<div class="card"><div class="toolbar"><h2 style="margin:0">Maintenance schedule</h2><select id="filter"><option value="all">All tasks</option><option value="overdue">Overdue</option><option value="soon">Due soon</option><option value="ok">Scheduled later</option></select></div>
+<div class="tablewrap"><table><thead><tr><th>Machine</th><th>Maintenance</th><th>Last done</th><th>Next due</th><th>Status</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div id="empty" class="empty">No tasks yet. Add your first machine using the form.</div>
+<p class="note">Tasks are saved in this browser on this device. This demo does not send automatic notifications.</p></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id),KEY='machine-maintenance-scheduler-v1';
+let tasks=[];try{tasks=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(tasks))tasks=[]}catch(e){tasks=[]}
+const today=()=>{let d=new Date();d.setHours(0,0,0,0);return d},parse=s=>{let [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)},fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+const next=t=>{let d=parse(t.lastDate);d.setDate(d.getDate()+Number(t.interval));return d},diff=d=>Math.round((d-today())/86400000),status=t=>{let n=diff(next(t));return n<0?'overdue':n<=7?'soon':'ok'};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function save(){localStorage.setItem(KEY,JSON.stringify(tasks));render()}
+function render(){let counts={overdue:0,soon:0,ok:0};tasks.forEach(t=>counts[status(t)]++);$('total').textContent=tasks.length;$('soon').textContent=counts.soon;$('late').textContent=counts.overdue;
+let f=$('filter').value,view=tasks.map((t,i)=>({...t,i})).filter(t=>f==='all'||status(t)===f);
+$('rows').innerHTML=view.map(t=>{let s=status(t),label=s==='overdue'?'Overdue':s==='soon'?'Due soon':'Scheduled';return `<tr><td><b>${esc(t.machine)}</b>${t.notes?`<div class="note">${esc(t.notes)}</div>`:''}</td><td>${esc(t.type)}</td><td>${fmt(parse(t.lastDate))}</td><td>${fmt(next(t))}</td><td><span class="pill ${s}">${label}</span></td><td><button onclick="done(${t.i})">Mark done</button> <button class="danger" onclick="removeTask(${t.i})">Delete</button></td></tr>`}).join('');
+$('empty').style.display=view.length?'none':'block';$('empty').textContent=tasks.length?'No tasks match this filter.':'No tasks yet. Add your first machine using the form.'}
+$('form').addEventListener('submit',e=>{e.preventDefault();let machine=$('machine').value.trim(),lastDate=$('lastDate').value,interval=Number($('interval').value);if(!machine||!lastDate||!Number.isInteger(interval)||interval<1)return;tasks.push({machine,type:$('type').value,lastDate,interval,notes:$('notes').value.trim()});e.target.reset();$('interval').value=30;save()});
+$('filter').addEventListener('change',render);
+window.done=i=>{tasks[i].lastDate=new Date().toLocaleDateString('en-CA');save()};
+window.removeTask=i=>{if(confirm('Delete this maintenance task?')){tasks.splice(i,1);save()}};
+$('sample').addEventListener('click',()=>{if(tasks.length&&!confirm('Add sample machines to your existing schedule?'))return;const date=n=>{let d=new Date();d.setDate(d.getDate()+n);return d.toLocaleDateString('en-CA')};tasks.push({machine:'CNC Milling Machine',type:'Inspection',lastDate:date(-25),interval:30,notes:'Check spindle and coolant'},{machine:'Lathe Machine',type:'Lubrication',lastDate:date(-35),interval:30,notes:'Lubricate guideways and bearings'},{machine:'Air Compressor',type:'General servicing',lastDate:date(-5),interval:30,notes:'Check pressure and filter'});save()});
+render();
+</script></body></html>
